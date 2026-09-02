@@ -590,7 +590,6 @@ def update_google_sheet(df, sheet_id, tab_name):
     try:
         sheet = gc.open_by_key(sheet_id)
         
-        # البحث عن ورقة العمل بالاسم، وإذا لم تكن موجودة يقوم بإنشائها تلقائياً
         try:
             worksheet = sheet.worksheet(tab_name)
         except gspread.exceptions.WorksheetNotFound:
@@ -681,15 +680,13 @@ def main():
                     print(f"Error for {title}: {e}")
                     failures.append(title)
 
-consolidated = None
+        consolidated = None
         sheet_id = "1j5wS-qr6No0uWSr4p_7jbYYCsqVqr17s7Bx1wTlpuwc"
 
-        # رفع بيانات كل منصة في ورقة عمل (Tab) منفصلة باسمها
         if frames:
             for title, df in frames.items():
                 update_google_sheet(df, sheet_id, title)
 
-        # رفع البيانات المجمعة (Consolidated) في ورقة عمل خاصة بها
         if consolidate and frames:
             print("\n=== Consolidate ===")
             consolidated = consolidate_frames(frames)
@@ -717,5 +714,3 @@ consolidated = None
 
 if __name__ == "__main__":
     main()
-
-
