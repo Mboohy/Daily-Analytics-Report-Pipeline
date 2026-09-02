@@ -401,7 +401,6 @@ def export_platform(config, schema, platform):
 
     if not rows:
         print(f"⚠️ No data found for {platform['title']}.")
-        print("   -> Check if the table is empty or if Row Level Security (RLS) is blocking read access.")
         df = pd.DataFrame(columns=config["columns"])
         df.to_excel(output_file, index=False, engine="openpyxl")
         return df
@@ -506,19 +505,31 @@ def consolidate_frames(frames, output_file="consolidated.xlsx"):
     if not frames:
         raise ValueError("No platform spreadsheets to consolidate.")
 
-    has_email = any("email" in df.columns for df in frames.values())
+    valid_frames = {title: df for title, df in frames.items() if not df.empty}
+    
+    if not valid_frames:
+        print("⚠️ Warning: All platform DataFrames are empty. Consolidated sheet will be empty.")
+        columns = consolidated_columns(frames)
+        return pd.DataFrame(columns=columns)
 
+    has_email = any("email" in df.columns for df in valid_frames.values())
+
+    # Fallback to simple concatenation if no email column is present
     if not has_email:
-        print("⚠️ Warning: Cannot consolidate without an 'email' column.")
-        return pd.DataFrame()
+        print("⚠️ Warning: No 'email' column found. Combining all frames directly.")
+        combined_list = []
+        for title, df in valid_frames.items():
+            temp_df = df.copy()
+            temp_df["platforms"] = title
+            combined_list.append(temp_df)
+        result = pd.concat(combined_list, ignore_index=True)
+        result.to_excel(output_file, index=False, engine="openpyxl")
+        return result
 
     groups = {}
     group_order = []
 
-    for title, df in frames.items():
-        if df.empty:
-            continue
-            
+    for title, df in valid_frames.items():
         for index, row in df.iterrows():
             key = email_key(row["email"]) if "email" in df.columns else None
 
@@ -548,10 +559,7 @@ def consolidate_frames(frames, output_file="consolidated.xlsx"):
                 group["values"].setdefault(column, [])
                 unique_extend(group["values"][column], values_from_cell(row[column]))
 
-    if not groups:
-        return pd.DataFrame(columns=consolidated_columns(frames))
-
-    columns = consolidated_columns(frames)
+    columns = consolidated_columns(valid_frames)
     merged_rows = []
 
     for group_key in group_order:
@@ -601,7 +609,6 @@ def update_google_sheet(df, sheet_id, tab_name):
             
         worksheet.clear()
         
-        # Safe dataframe processing to prevent silent gspread failures on Nulls/NaNs
         safe_df = df.copy().astype(str)
         safe_df = safe_df.replace(["nan", "NaT", "<NA>", "None"], "")
         
