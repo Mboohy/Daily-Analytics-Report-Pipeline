@@ -190,13 +190,12 @@ def fetch_all(config, access_token):
 
         all_rows.extend(rows)
 
-        print(f"Received {len(rows)} rows. Total: {len(all_rows)}")
-
         if len(rows) < this_page_size:
             break
 
         after_id = rows[-1]["id"]
 
+    print(f"Received {len(all_rows)} total rows from Supabase.")
     return all_rows
 
 
@@ -376,7 +375,7 @@ def apply_column_types(df, config, schema):
 
 
 def export_excel(config, schema, rows, output_file):
-    print(f"Exporting {len(rows)} rows to {output_file}...")
+    print(f"Processing and exporting {len(rows)} rows...")
 
     df = pd.DataFrame(rows, columns=config["columns"])
     df = expand_json_columns(df, config, schema)
@@ -387,8 +386,6 @@ def export_excel(config, schema, rows, output_file):
         index=False,
         engine="openpyxl",
     )
-
-    print(f"Done: {output_file}")
 
     return df
 
@@ -403,7 +400,8 @@ def export_platform(config, schema, platform):
     rows = fetch_all(target, access_token)
 
     if not rows:
-        print("No data found.")
+        print(f"⚠️ No data found for {platform['title']}.")
+        print("   -> Check if the table is empty or if Row Level Security (RLS) is blocking read access.")
         df = pd.DataFrame(columns=config["columns"])
         df.to_excel(output_file, index=False, engine="openpyxl")
         return df
@@ -511,12 +509,16 @@ def consolidate_frames(frames, output_file="consolidated.xlsx"):
     has_email = any("email" in df.columns for df in frames.values())
 
     if not has_email:
-        raise ValueError("Cannot consolidate without an 'email' column.")
+        print("⚠️ Warning: Cannot consolidate without an 'email' column.")
+        return pd.DataFrame()
 
     groups = {}
     group_order = []
 
     for title, df in frames.items():
+        if df.empty:
+            continue
+            
         for index, row in df.iterrows():
             key = email_key(row["email"]) if "email" in df.columns else None
 
@@ -546,6 +548,9 @@ def consolidate_frames(frames, output_file="consolidated.xlsx"):
                 group["values"].setdefault(column, [])
                 unique_extend(group["values"][column], values_from_cell(row[column]))
 
+    if not groups:
+        return pd.DataFrame(columns=consolidated_columns(frames))
+
     columns = consolidated_columns(frames)
     merged_rows = []
 
@@ -573,7 +578,7 @@ def consolidate_frames(frames, output_file="consolidated.xlsx"):
 
 
 def update_google_sheet(df, sheet_id, tab_name):
-    print(f"Updating Google Sheet tab: {tab_name}...")
+    print(f"Updating Google Sheet tab '{tab_name}' with {len(df)} rows...")
     scopes = [
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive'
@@ -584,10 +589,9 @@ def update_google_sheet(df, sheet_id, tab_name):
         print("Warning: credentials.json not found. Skipping Google Sheets update.")
         return
 
-    credentials = Credentials.from_service_account_file(credentials_path, scopes=scopes)
-    gc = gspread.authorize(credentials)
-    
     try:
+        credentials = Credentials.from_service_account_file(credentials_path, scopes=scopes)
+        gc = gspread.authorize(credentials)
         sheet = gc.open_by_key(sheet_id)
         
         try:
@@ -596,7 +600,12 @@ def update_google_sheet(df, sheet_id, tab_name):
             worksheet = sheet.add_worksheet(title=tab_name, rows="1000", cols="20")
             
         worksheet.clear()
-        set_with_dataframe(worksheet, df)
+        
+        # Safe dataframe processing to prevent silent gspread failures on Nulls/NaNs
+        safe_df = df.copy().astype(str)
+        safe_df = safe_df.replace(["nan", "NaT", "<NA>", "None"], "")
+        
+        set_with_dataframe(worksheet, safe_df)
         print(f"Tab '{tab_name}' updated successfully.")
     except Exception as e:
         print(f"Failed to update Google Sheet tab '{tab_name}': {e}")
