@@ -572,8 +572,8 @@ def consolidate_frames(frames, output_file="consolidated.xlsx"):
     return result
 
 
-def update_google_sheet(df, sheet_id):
-    print("Updating Google Sheet...")
+def update_google_sheet(df, sheet_id, tab_name):
+    print(f"Updating Google Sheet tab: {tab_name}...")
     scopes = [
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive'
@@ -588,14 +588,19 @@ def update_google_sheet(df, sheet_id):
     gc = gspread.authorize(credentials)
     
     try:
-        # فتح الشيت ومسح محتوياته وتعبئته بالبيانات الجديدة
         sheet = gc.open_by_key(sheet_id)
-        worksheet = sheet.sheet1 
+        
+        # البحث عن ورقة العمل بالاسم، وإذا لم تكن موجودة يقوم بإنشائها تلقائياً
+        try:
+            worksheet = sheet.worksheet(tab_name)
+        except gspread.exceptions.WorksheetNotFound:
+            worksheet = sheet.add_worksheet(title=tab_name, rows="1000", cols="20")
+            
         worksheet.clear()
         set_with_dataframe(worksheet, df)
-        print("Google Sheet updated successfully.")
+        print(f"Tab '{tab_name}' updated successfully.")
     except Exception as e:
-        print(f"Failed to update Google Sheet: {e}")
+        print(f"Failed to update Google Sheet tab '{tab_name}': {e}")
 
 
 def print_summary(frames, consolidated=None):
@@ -676,15 +681,19 @@ def main():
                     print(f"Error for {title}: {e}")
                     failures.append(title)
 
-        consolidated = None
+consolidated = None
+        sheet_id = "1j5wS-qr6No0uWSr4p_7jbYYCsqVqr17s7Bx1wTlpuwc"
 
+        # رفع بيانات كل منصة في ورقة عمل (Tab) منفصلة باسمها
+        if frames:
+            for title, df in frames.items():
+                update_google_sheet(df, sheet_id, title)
+
+        # رفع البيانات المجمعة (Consolidated) في ورقة عمل خاصة بها
         if consolidate and frames:
             print("\n=== Consolidate ===")
             consolidated = consolidate_frames(frames)
-            
-            # رفع البيانات المجمعة إلى Google Sheets
-            sheet_id = "1j5wS-qr6No0uWSr4p_7jbYYCsqVqr17s7Bx1wTlpuwc"
-            update_google_sheet(consolidated, sheet_id)
+            update_google_sheet(consolidated, sheet_id, "Consolidated")
 
         if frames:
             print_summary(frames, consolidated)
