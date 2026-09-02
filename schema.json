@@ -1,0 +1,107 @@
+{
+  "analytics_profiles": {
+    "columns": {
+      "id": {
+        "type": "uuid",
+        "nullable": false
+      },
+      "created_at": {
+        "type": "timestamptz",
+        "nullable": false
+      },
+      "updated_at": {
+        "type": "timestamptz",
+        "nullable": false
+      },
+      "date_of_birth": {
+        "type": "date",
+        "nullable": true
+      },
+      "sex": {
+        "type": "text",
+        "nullable": true
+      },
+      "country": {
+        "type": "text",
+        "nullable": true
+      },
+      "telegram_id": {
+        "type": "text",
+        "nullable": true
+      },
+      "last_seen_announcements": {
+        "type": "timestamptz",
+        "nullable": false
+      },
+      "email": {
+        "type": "text",
+        "nullable": true
+      },
+      "last_signed_in": {
+        "type": "timestamptz",
+        "nullable": true
+      },
+      "is_confirmed": {
+        "type": "boolean",
+        "nullable": true
+      },
+      "first_name": {
+        "type": "text",
+        "nullable": true
+      },
+      "last_name": {
+        "type": "text",
+        "nullable": true
+      },
+      "active_months": {
+        "type": "jsonb",
+        "nullable": true
+      },
+      "last_active": {
+        "type": "timestamptz",
+        "nullable": true
+      },
+      "phone_number": {
+        "type": "text",
+        "nullable": true
+      },
+      "country_of_residence": {
+        "type": "text",
+        "nullable": true
+      },
+      "province": {
+        "type": "text",
+        "nullable": true
+      },
+      "city": {
+        "type": "text",
+        "nullable": true
+      },
+      "enrollment_form_data": {
+        "type": "jsonb",
+        "nullable": true,
+        "expand": {
+          "question_field": "questionnaire_question",
+          "answer_field": "answer",
+          "id_field": "question_id"
+        }
+      },
+      "is_verified": {
+        "type": "boolean",
+        "nullable": true
+      },
+      "cohort_titles": {
+        "type": "text[]",
+        "nullable": false
+      },
+      "learning_path_titles": {
+        "type": "text[]",
+        "nullable": false
+      },
+      "course_titles": {
+        "type": "text[]",
+        "nullable": false
+      }
+    }
+  }
+}
