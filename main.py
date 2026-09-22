@@ -340,6 +340,26 @@ def expand_json_columns(df, config, schema):
     return df
 
 
+def safe_parse_datetime(series, column_name, utc):
+    """Parse a datetime-like series, coercing unparseable or out-of-range
+    values (e.g. typo'd birth years like 3316 or 1007) to blank instead of
+    crashing the whole run."""
+    parsed = pd.to_datetime(series, utc=utc, format="ISO8601", errors="coerce")
+
+    invalid_mask = parsed.isna() & series.map(lambda v: not is_missing(v))
+
+    if invalid_mask.any():
+        bad_values = series[invalid_mask].unique().tolist()
+        preview = ", ".join(str(v) for v in bad_values[:5])
+        more = f" (+{len(bad_values) - 5} more)" if len(bad_values) > 5 else ""
+        print(
+            f"⚠️ {int(invalid_mask.sum())} value(s) in '{column_name}' were invalid "
+            f"or out of range and were left blank: {preview}{more}"
+        )
+
+    return parsed
+
+
 def apply_column_types(df, config, schema):
     columns = table_columns(schema, config["table"])
 
@@ -359,9 +379,11 @@ def apply_column_types(df, config, schema):
         elif column_type == "boolean":
             df[name] = df[name].astype("boolean")
         elif column_type == "timestamptz":
-            df[name] = pd.to_datetime(df[name], utc=True, format="ISO8601").dt.tz_localize(None)
+            parsed = safe_parse_datetime(df[name], name, utc=True)
+            df[name] = parsed.dt.tz_localize(None)
         elif column_type == "date":
-            df[name] = pd.to_datetime(df[name], utc=False, format="ISO8601").dt.date
+            parsed = safe_parse_datetime(df[name], name, utc=False)
+            df[name] = parsed.dt.date
         elif column_type == "jsonb":
             df[name] = df[name].map(
                 lambda value: json.dumps(value)
@@ -506,7 +528,7 @@ def consolidate_frames(frames, output_file="consolidated.xlsx"):
         raise ValueError("No platform spreadsheets to consolidate.")
 
     valid_frames = {title: df for title, df in frames.items() if not df.empty}
-    
+
     if not valid_frames:
         print("⚠️ Warning: All platform DataFrames are empty. Consolidated sheet will be empty.")
         columns = consolidated_columns(frames)
@@ -591,7 +613,7 @@ def update_google_sheet(df, sheet_id, tab_name):
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive'
     ]
-    
+
     credentials_path = Path(__file__).parent / "credentials.json"
     if not credentials_path.exists():
         print("Warning: credentials.json not found. Skipping Google Sheets update.")
@@ -601,17 +623,17 @@ def update_google_sheet(df, sheet_id, tab_name):
         credentials = Credentials.from_service_account_file(credentials_path, scopes=scopes)
         gc = gspread.authorize(credentials)
         sheet = gc.open_by_key(sheet_id)
-        
+
         try:
             worksheet = sheet.worksheet(tab_name)
         except gspread.exceptions.WorksheetNotFound:
             worksheet = sheet.add_worksheet(title=tab_name, rows="1000", cols="20")
-            
+
         worksheet.clear()
-        
+
         safe_df = df.copy().astype(str)
         safe_df = safe_df.replace(["nan", "NaT", "<NA>", "None"], "")
-        
+
         set_with_dataframe(worksheet, safe_df)
         print(f"Tab '{tab_name}' updated successfully.")
     except Exception as e:
