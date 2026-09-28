@@ -1,5 +1,6 @@
 import json
 import re
+import time
 from datetime import date, datetime
 from pathlib import Path
 
@@ -609,7 +610,31 @@ def consolidate_frames(frames, output_file="consolidated.xlsx"):
     return result
 
 
-def update_google_sheet(df, sheet_id, tab_name):
+DEFAULT_SHEET_ID = "1j5wS-qr6No0uWSr4p_7jbYYCsqVqr17s7Bx1wTlpuwc"
+
+
+def sheet_id_for(config, platform=None):
+    """Per-platform sheet_id wins, then top-level sheet_id, then the default."""
+    if platform and platform.get("sheet_id"):
+        return platform["sheet_id"]
+
+    return config.get("sheet_id") or DEFAULT_SHEET_ID
+
+
+def with_retries(action, attempts=3):
+    for attempt in range(1, attempts + 1):
+        try:
+            return action()
+        except gspread.exceptions.APIError as e:
+            if attempt == attempts:
+                raise
+            wait = 10 * attempt
+            print(f"  Google API error ({e}); retrying in {wait}s...")
+            time.sleep(wait)
+
+
+def update_google_sheet(df, sheet_id, tab_name, chunk_rows=20000):
+    """Write df to a tab. Returns True on success, False on failure."""
     print(f"Updating Google Sheet tab '{tab_name}' with {len(df)} rows...")
     scopes = [
         'https://www.googleapis.com/auth/spreadsheets',
@@ -619,7 +644,7 @@ def update_google_sheet(df, sheet_id, tab_name):
     credentials_path = Path(__file__).parent / "credentials.json"
     if not credentials_path.exists():
         print("Warning: credentials.json not found. Skipping Google Sheets update.")
-        return
+        return True
 
     try:
         credentials = Credentials.from_service_account_file(credentials_path, scopes=scopes)
@@ -636,10 +661,35 @@ def update_google_sheet(df, sheet_id, tab_name):
         safe_df = df.copy().astype(str)
         safe_df = safe_df.replace(["nan", "NaT", "<NA>", "None"], "")
 
-        set_with_dataframe(worksheet, safe_df)
+        with_retries(
+            lambda: worksheet.resize(
+                rows=max(len(safe_df) + 1, 2),
+                cols=max(len(safe_df.columns), 1),
+            )
+        )
+
+        total = len(safe_df)
+
+        for start in range(0, max(total, 1), chunk_rows):
+            chunk = safe_df.iloc[start:start + chunk_rows]
+            first = start == 0
+
+            with_retries(
+                lambda chunk=chunk, first=first, start=start: set_with_dataframe(
+                    worksheet,
+                    chunk,
+                    row=1 if first else start + 2,
+                    include_column_header=first,
+                )
+            )
+
+            print(f"  wrote rows {start + 1}-{start + len(chunk)} of {total}")
+
         print(f"Tab '{tab_name}' updated successfully.")
+        return True
     except Exception as e:
-        print(f"Failed to update Google Sheet tab '{tab_name}': {e}")
+        print(f"Failed to update Google Sheet tab '{tab_name}' (sheet {sheet_id}): {e}")
+        return False
 
 
 def print_summary(frames, consolidated=None):
@@ -712,7 +762,8 @@ def run_extra_exports(config, schema, platforms, sheet_id):
                     continue
 
                 df = export_excel(target, schema, rows, f"{name}.xlsx")
-                update_google_sheet(df, sheet_id, name)
+                if not update_google_sheet(df, sheet_id_for(config, platform), name):
+                    failed.append(name)
             except Exception as e:
                 print(f"Error for {name}: {e}")
                 failed.append(name)
@@ -764,16 +815,23 @@ def main():
                     failures.append(title)
 
         consolidated = None
-        sheet_id = "1j5wS-qr6No0uWSr4p_7jbYYCsqVqr17s7Bx1wTlpuwc"
+        sheet_id = sheet_id_for(config)
+        platforms_by_title = {p["title"]: p for p in platforms}
 
         if frames:
             for title, df in frames.items():
-                update_google_sheet(df, sheet_id, title)
+                target_sheet = sheet_id_for(config, platforms_by_title.get(title))
+
+                if not update_google_sheet(df, target_sheet, title):
+                    failures.append(f"{title} (Google Sheet)")
 
         if consolidate and frames:
             print("\n=== Consolidate ===")
             consolidated = consolidate_frames(frames)
-            update_google_sheet(consolidated, sheet_id, "Consolidated")
+            consolidated_sheet = config.get("consolidated_sheet_id") or sheet_id
+
+            if not update_google_sheet(consolidated, consolidated_sheet, "Consolidated"):
+                failures.append("Consolidated (Google Sheet)")
 
         if fetch and frames:
             failures.extend(run_extra_exports(config, schema, platforms, sheet_id))
