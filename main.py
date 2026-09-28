@@ -145,6 +145,8 @@ def get_page(config, access_token, page_size, after_id=None):
         "limit": page_size,
     }
 
+    params.update(config.get("filters", {}))
+
     if after_id is not None:
         params["id"] = f"gt.{after_id}"
 
@@ -675,6 +677,49 @@ def print_summary(frames, consolidated=None):
         print(f"  ({len(emails)} with email, {missing} without)")
 
 
+def run_extra_exports(config, schema, platforms, sheet_id):
+    """Export additional tables/views listed under 'extra_exports' in config.json."""
+    base = {
+        k: v for k, v in config.items()
+        if k not in ("platforms", "extra_exports", "columns", "table", "filters")
+    }
+    failed = []
+
+    for export in config.get("extra_exports", []):
+        wanted = export.get("platforms")
+
+        for platform in platforms:
+            if wanted and platform["title"] not in wanted:
+                continue
+
+            target = {
+                **base,
+                **export,
+                "title": platform["title"],
+                "supabase_url": platform["supabase_url"],
+                "supabase_anon_key": platform["supabase_anon_key"],
+            }
+            name = f"{platform['title']}_{export['name']}"
+
+            try:
+                validate_columns(target, schema)
+                print(f"\n=== {name} ===")
+                token = login(target)
+                rows = fetch_all(target, token)
+
+                if not rows:
+                    print(f"⚠️ No data found for {name}.")
+                    continue
+
+                df = export_excel(target, schema, rows, f"{name}.xlsx")
+                update_google_sheet(df, sheet_id, name)
+            except Exception as e:
+                print(f"Error for {name}: {e}")
+                failed.append(name)
+
+    return failed
+
+
 def main():
     try:
         config = load_config()
@@ -729,6 +774,9 @@ def main():
             print("\n=== Consolidate ===")
             consolidated = consolidate_frames(frames)
             update_google_sheet(consolidated, sheet_id, "Consolidated")
+
+        if fetch and frames:
+            failures.extend(run_extra_exports(config, schema, platforms, sheet_id))
 
         if frames:
             print_summary(frames, consolidated)
