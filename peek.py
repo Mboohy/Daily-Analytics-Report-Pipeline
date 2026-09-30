@@ -19,14 +19,20 @@ login.raise_for_status()
 token = login.json()["access_token"]
 
 response = requests.get(
-    f"{platform['supabase_url']}/rest/v1/view_payments_with_profiles",
+    f"{platform['supabase_url']}/rest/v1/analytics_profiles",
     headers={
         "apikey": platform["supabase_anon_key"],
         "Authorization": f"Bearer {token}",
     },
-    params={"limit": 1, "order": "id.desc"},
+    params={"select": "*", "limit": 1},
     timeout=60,
 )
 
 print("HTTP", response.status_code)
-print(json.dumps(response.json(), indent=2, ensure_ascii=False))
+data = response.json()
+
+if isinstance(data, list) and data:
+    for key in data[0]:
+        print(key)
+else:
+    print(data)
