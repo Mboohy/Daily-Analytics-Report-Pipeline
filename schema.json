@@ -101,6 +101,58 @@
       "course_titles": {
         "type": "text[]",
         "nullable": false
+      },
+      "age_range": {
+        "type": "text",
+        "nullable": true
+      },
+      "avatar_url": {
+        "type": "text",
+        "nullable": true
+      },
+      "civil_id": {
+        "type": "text",
+        "nullable": true
+      },
+      "education_level": {
+        "type": "text",
+        "nullable": true
+      },
+      "how_did_you_hear_about_us": {
+        "type": "text",
+        "nullable": true
+      },
+      "name_email_combined": {
+        "type": "text",
+        "nullable": true
+      },
+      "participated_before": {
+        "type": "boolean",
+        "nullable": true
+      },
+      "residence_country": {
+        "type": "text",
+        "nullable": true
+      },
+      "telegram_chat_id": {
+        "type": "text",
+        "nullable": true
+      },
+      "telegram_name": {
+        "type": "text",
+        "nullable": true
+      },
+      "telegram_phone_number": {
+        "type": "text",
+        "nullable": true
+      },
+      "telegram_username": {
+        "type": "text",
+        "nullable": true
+      },
+      "university_degree": {
+        "type": "text",
+        "nullable": true
       }
     }
   },
