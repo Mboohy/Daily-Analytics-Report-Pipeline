@@ -84,6 +84,19 @@ def with_platform(config, platform):
     merged["title"] = platform["title"]
     merged["supabase_url"] = platform["supabase_url"]
     merged["supabase_anon_key"] = platform["supabase_anon_key"]
+
+    # A platform can fully replace the shared column list with "columns",
+    # or just add columns on top of it with "extra_columns" (for fields
+    # that only exist on that particular platform's table/view).
+    if platform.get("columns"):
+        merged["columns"] = list(platform["columns"])
+    elif platform.get("extra_columns"):
+        base_columns = list(merged.get("columns", []))
+        for name in platform["extra_columns"]:
+            if name not in base_columns:
+                base_columns.append(name)
+        merged["columns"] = base_columns
+
     return merged
 
 
