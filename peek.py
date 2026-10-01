@@ -19,20 +19,18 @@ login.raise_for_status()
 token = login.json()["access_token"]
 
 response = requests.get(
-    f"{platform['supabase_url']}/rest/v1/analytics_payments",
+    f"{platform['supabase_url']}/rest/v1/",
     headers={
         "apikey": platform["supabase_anon_key"],
         "Authorization": f"Bearer {token}",
     },
-    params={"select": "*", "limit": 1},
-    timeout=60,
+    timeout=30,
 )
 
 print("HTTP", response.status_code)
-data = response.json()
+spec = response.json()
+paths = spec.get("paths", {})
 
-if isinstance(data, list) and data:
-    for key in data[0]:
-        print(key)
-else:
-    print(data)
+print(f"\nعدد الجداول/الـ views المسموح بيها: {len(paths)}\n")
+for name in sorted(paths):
+    print(name.lstrip("/"))
