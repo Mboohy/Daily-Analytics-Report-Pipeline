@@ -209,13 +209,169 @@
       "created_at": {
         "type": "timestamptz",
         "nullable": false
+      }
+    }
+  },
+  "view_payments_with_profiles": {
+    "columns": {
+      "id": {
+        "type": "uuid",
+        "nullable": false
+      },
+      "created_at": {
+        "type": "timestamptz",
+        "nullable": false
+      },
+      "course_id": {
+        "type": "uuid",
+        "nullable": true
+      },
+      "learning_path_id": {
+        "type": "uuid",
+        "nullable": true
+      },
+      "cohort_id": {
+        "type": "uuid",
+        "nullable": true
+      },
+      "student_id": {
+        "type": "uuid",
+        "nullable": true
+      },
+      "provider_id": {
+        "type": "text",
+        "nullable": true
+      },
+      "amount": {
+        "type": "numeric",
+        "nullable": true
+      },
+      "status": {
+        "type": "text",
+        "nullable": true
+      },
+      "parent_id": {
+        "type": "uuid",
+        "nullable": true
+      },
+      "parent_type": {
+        "type": "text",
+        "nullable": true
+      },
+      "parent_title": {
+        "type": "text",
+        "nullable": true
+      },
+      "reference_id": {
+        "type": "text",
+        "nullable": true
+      },
+      "receipt_url": {
+        "type": "text",
+        "nullable": true
+      },
+      "manual_receipt_path": {
+        "type": "text",
+        "nullable": true
+      },
+      "rejection_reason": {
+        "type": "text",
+        "nullable": true
+      },
+      "coupon_id": {
+        "type": "uuid",
+        "nullable": true
+      },
+      "coupon_code": {
+        "type": "text",
+        "nullable": true
+      },
+      "student_note": {
+        "type": "text",
+        "nullable": true
+      },
+      "admin_note": {
+        "type": "text",
+        "nullable": true
+      },
+      "admin_note_edited_by": {
+        "type": "text",
+        "nullable": true
+      },
+      "admin_note_edited_by_name_email": {
+        "type": "text",
+        "nullable": true
+      },
+      "admin_note_last_edited_at": {
+        "type": "timestamptz",
+        "nullable": true
+      },
+      "admin_attachments": {
+        "type": "jsonb",
+        "nullable": true
+      },
+      "manual_reviewed_by": {
+        "type": "text",
+        "nullable": true
+      },
+      "manual_reviewed_by_first_name": {
+        "type": "text",
+        "nullable": true
+      },
+      "manual_reviewed_by_last_name": {
+        "type": "text",
+        "nullable": true
+      },
+      "manual_reviewed_by_email": {
+        "type": "text",
+        "nullable": true
+      },
+      "manual_reviewed_at": {
+        "type": "timestamptz",
+        "nullable": true
+      },
+      "invoice_id": {
+        "type": "uuid",
+        "nullable": true
+      },
+      "first_name": {
+        "type": "text",
+        "nullable": true
+      },
+      "last_name": {
+        "type": "text",
+        "nullable": true
       },
       "email": {
         "type": "text",
         "nullable": true
       },
-      "is_installment": {
-        "type": "boolean",
+      "student_name_email": {
+        "type": "text",
+        "nullable": true
+      },
+      "country_of_residence": {
+        "type": "text",
+        "nullable": true
+      },
+      "telegram_chat_id": {
+        "type": "text",
+        "nullable": true
+      },
+      "telegram_username": {
+        "type": "text",
+        "nullable": true
+      },
+      "telegram_name": {
+        "type": "text",
+        "nullable": true
+      },
+      "telegram_phone_number": {
+        "type": "text",
+        "nullable": true
+      },
+      "provider_label": {
+        "type": "text",
         "nullable": true
       }
     }
