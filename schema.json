@@ -209,6 +209,14 @@
       "created_at": {
         "type": "timestamptz",
         "nullable": false
+      },
+      "email": {
+        "type": "text",
+        "nullable": true
+      },
+      "is_installment": {
+        "type": "boolean",
+        "nullable": true
       }
     }
   }
