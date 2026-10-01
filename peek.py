@@ -19,7 +19,7 @@ login.raise_for_status()
 token = login.json()["access_token"]
 
 response = requests.get(
-    f"{platform['supabase_url']}/rest/v1/analytics_profiles",
+    f"{platform['supabase_url']}/rest/v1/analytics_payments",
     headers={
         "apikey": platform["supabase_anon_key"],
         "Authorization": f"Bearer {token}",
