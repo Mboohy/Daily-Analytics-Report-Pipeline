@@ -373,6 +373,10 @@
       "provider_label": {
         "type": "text",
         "nullable": true
+      },
+      "is_installment": {
+        "type": "boolean",
+        "nullable": true
       }
     }
   }
