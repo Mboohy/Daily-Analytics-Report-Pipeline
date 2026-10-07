@@ -408,8 +408,55 @@ def apply_column_types(df, config, schema):
             )
         elif column_type == "text[]":
             df[name] = df[name].map(format_answer)
+        elif column_type == "numeric":
+            df[name] = pd.to_numeric(df[name], errors="coerce")
 
     return df
+
+
+def add_payment_type(df, config):
+    """Infer 'دفع كامل' / 'تقسيط' from amount vs total - discount, when the
+    config has an 'infer_payment_type' rule (see config.json)."""
+    rule = config.get("infer_payment_type")
+
+    if not rule:
+        return df
+
+    amount_col = rule.get("amount_column", "amount")
+    total_col = rule.get("total_column", "total")
+    discount_col = rule.get("discount_column", "discount")
+    output_col = rule.get("output_column", "payment_type")
+
+    if amount_col not in df.columns or total_col not in df.columns:
+        return df
+
+    amount = pd.to_numeric(df[amount_col], errors="coerce")
+    total = pd.to_numeric(df[total_col], errors="coerce")
+
+    if discount_col in df.columns:
+        discount = pd.to_numeric(df[discount_col], errors="coerce").fillna(0)
+    else:
+        discount = 0
+
+    expected_full = total - discount
+
+    def classify(a, expected):
+        if pd.isna(a) or pd.isna(expected):
+            return None
+        if abs(a - expected) < 0.01:
+            return "دفع كامل"
+        if a < expected:
+            return "تقسيط"
+        return "أكبر من المتوقع"
+
+    df[output_col] = [classify(a, e) for a, e in zip(amount, expected_full)]
+
+    # put it right after the amount column for readability
+    location = df.columns.get_loc(amount_col) + 1
+    cols = list(df.columns)
+    cols.remove(output_col)
+    cols.insert(location, output_col)
+    return df[cols]
 
 
 def export_excel(config, schema, rows, output_file):
@@ -418,6 +465,7 @@ def export_excel(config, schema, rows, output_file):
     df = pd.DataFrame(rows, columns=config["columns"])
     df = expand_json_columns(df, config, schema)
     df = apply_column_types(df, config, schema)
+    df = add_payment_type(df, config)
 
     df.to_excel(
         output_file,
