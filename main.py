@@ -147,7 +147,7 @@ def login(config):
     return data["access_token"]
 
 
-def get_page(config, access_token, page_size, after_id=None):
+def get_page(config, access_token, page_size, after_id=None, want_count=False):
     select_columns = list(config["columns"])
 
     if "id" not in select_columns:
@@ -164,19 +164,30 @@ def get_page(config, access_token, page_size, after_id=None):
     if after_id is not None:
         params["id"] = f"gt.{after_id}"
 
+    headers = {
+        "apikey": config["supabase_anon_key"],
+        "Authorization": f"Bearer {access_token}",
+    }
+    if want_count:
+        headers["Prefer"] = "count=exact"
+
     response = requests.get(
         f"{config['supabase_url']}/rest/v1/{config['table']}",
-        headers={
-            "apikey": config["supabase_anon_key"],
-            "Authorization": f"Bearer {access_token}",
-        },
+        headers=headers,
         params=params,
-        timeout=60,
+        timeout=120,
     )
 
     response.raise_for_status()
 
-    return response.json()
+    server_total = None
+    content_range = response.headers.get("Content-Range", "")
+    if "/" in content_range:
+        tail = content_range.split("/")[-1]
+        if tail.isdigit():
+            server_total = int(tail)
+
+    return response.json(), server_total
 
 
 def fetch_all(config, access_token):
@@ -184,12 +195,14 @@ def fetch_all(config, access_token):
     after_id = None
     page_size = config["page_size"]
     total_limit = config.get("limit")
+    server_total = None
 
     while True:
         remaining = None
         if total_limit is not None:
             remaining = total_limit - len(all_rows)
             if remaining <= 0:
+                print(f"⚠️ Reached configured limit ({total_limit}); raise 'limit' if more rows exist.")
                 break
 
         this_page_size = page_size if remaining is None else min(page_size, remaining)
@@ -199,19 +212,34 @@ def fetch_all(config, access_token):
         else:
             print(f"Fetching next {this_page_size} rows after {after_id}...")
 
-        rows = get_page(config, access_token, this_page_size, after_id)
+        rows, total = get_page(
+            config, access_token, this_page_size, after_id,
+            want_count=(after_id is None),
+        )
+        if total is not None:
+            server_total = total
 
+        # Stop only on an empty page. A short page does NOT mean the end:
+        # the server may cap rows per request (PostgREST max-rows).
         if not rows:
             break
 
         all_rows.extend(rows)
-
-        if len(rows) < this_page_size:
-            break
-
         after_id = rows[-1]["id"]
 
     print(f"Received {len(all_rows)} total rows from Supabase.")
+
+    if server_total is not None:
+        print(f"Server reports {server_total} rows in total.")
+        if len(all_rows) < server_total:
+            print(f"⚠️ MISMATCH: fetched {len(all_rows)} of {server_total} rows "
+                  "(RLS/limit/row cap may be hiding data).")
+
+    for col in ("created_at", "last_active"):
+        vals = [r.get(col) for r in all_rows if r.get(col)]
+        if vals:
+            print(f"Newest {col}: {max(vals)}")
+
     return all_rows
 
 
